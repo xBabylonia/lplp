@@ -1,0 +1,2551 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0,viewport-fit=cover"/>
+<meta name="mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+<meta name="theme-color" content="#0d0b0b"/>
+<title>Disposable · Film Camera</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet"/>
+<style>
+/* =====================================================
+   DESIGN TOKENS
+===================================================== */
+:root{
+  --bg:#0d0b0b;
+  --body:#171414;
+  --surface:#1f1c1c;
+  --surface2:#272323;
+  --border:rgba(255,255,255,0.08);
+  --border2:rgba(255,255,255,0.14);
+  --text:#f0ebe3;
+  --text2:#b0a89e;
+  --muted:#6a6460;
+  --accent:#F5C518;
+  --accent-dim:#c99e10;
+  --orange:#E87A00;
+  --red:#e8453c;
+  --white:#ffffff;
+  --shutter:#f0ede8;
+  --r-sm:6px;
+  --r-md:12px;
+  --r-lg:20px;
+  --r-xl:28px;
+  --r-full:9999px;
+  --ease-spring:cubic-bezier(0.34,1.56,0.64,1);
+  --ease-out:cubic-bezier(0.0,0.0,0.2,1);
+  --ease-in:cubic-bezier(0.4,0.0,1,1);
+  --dur-fast:120ms;
+  --dur-norm:240ms;
+  --dur-slow:380ms;
+  --shadow-lg:0 20px 60px rgba(0,0,0,0.7);
+  --shadow-panel:0 -8px 40px rgba(0,0,0,0.6);
+}
+
+/* =====================================================
+   RESET & BASE
+===================================================== */
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+html{height:100%;-webkit-tap-highlight-color:transparent;touch-action:manipulation;}
+body{
+  height:100%;
+  font-family:'DM Sans',sans-serif;
+  background:#0d0b0b;
+  color:var(--text);
+  overflow:hidden;
+  user-select:none;
+  -webkit-user-select:none;
+}
+button{
+  background:none;border:none;cursor:pointer;
+  color:inherit;font-family:inherit;
+  -webkit-tap-highlight-color:transparent;
+  touch-action:manipulation;
+}
+img{display:block;max-width:100%;}
+canvas{display:block;}
+
+.hidden{display:none!important;}
+
+/* =====================================================
+   WELCOME SCREEN
+===================================================== */
+#welcome{
+  position:fixed;inset:0;
+  display:flex;align-items:center;justify-content:center;
+  background:var(--bg);
+  z-index:9000;
+  padding:24px;
+}
+.welcome-inner{
+  display:flex;flex-direction:column;align-items:center;
+  gap:0;max-width:320px;width:100%;text-align:center;
+}
+.welcome-film-strip{
+  display:flex;gap:4px;margin-bottom:32px;
+}
+.film-hole{
+  width:28px;height:18px;
+  border-radius:4px;
+  background:var(--surface2);
+  border:2px solid var(--border2);
+}
+.welcome-logo{
+  font-family:'Bebas Neue',sans-serif;
+  font-size:clamp(52px,12vw,68px);
+  letter-spacing:0.06em;
+  line-height:0.9;
+  color:var(--text);
+  margin-bottom:6px;
+}
+.welcome-logo span{color:var(--accent);}
+.welcome-tagline{
+  font-size:12px;letter-spacing:0.18em;
+  color:var(--text2);text-transform:uppercase;
+  margin-bottom:48px;
+}
+.btn-allow{
+  background:var(--accent);
+  color:#111;
+  font-family:'Bebas Neue',sans-serif;
+  font-size:20px;letter-spacing:0.12em;
+  padding:16px 40px;
+  border-radius:var(--r-full);
+  width:100%;
+  transition:transform var(--dur-fast) var(--ease-spring),
+             background var(--dur-fast);
+}
+.btn-allow:hover{background:#ffe033;}
+.btn-allow:active{transform:scale(0.96);}
+.permission-denied{
+  margin-top:24px;
+  padding:16px;border-radius:var(--r-md);
+  background:var(--surface);
+  border:1px solid var(--border2);
+  text-align:left;
+}
+.permission-denied p{font-size:13px;color:var(--text2);line-height:1.5;}
+.permission-denied p+p{margin-top:8px;}
+.permission-denied strong{color:var(--text);}
+.loading-ring{
+  width:44px;height:44px;
+  border:3px solid var(--surface2);
+  border-top-color:var(--accent);
+  border-radius:50%;
+  animation:spin 0.8s linear infinite;
+  margin-bottom:20px;
+}
+@keyframes spin{to{transform:rotate(360deg);}}
+
+/* =====================================================
+   APP SHELL
+===================================================== */
+#app{
+  position:fixed;inset:0;
+  display:flex;flex-direction:column;
+  background:var(--bg);
+  overflow:hidden;
+}
+@media(min-width:600px){
+  body{display:flex;align-items:center;justify-content:center;}
+  #app{
+    position:relative;inset:auto;
+    width:440px;
+    height:min(860px,100dvh);
+    border-radius:var(--r-xl);
+    overflow:hidden;
+    box-shadow:var(--shadow-lg);
+  }
+  #welcome{border-radius:var(--r-xl);}
+}
+
+/* =====================================================
+   HUD (TOP INFO BAR)
+===================================================== */
+.hud{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:10px 14px 8px;
+  background:linear-gradient(180deg,rgba(0,0,0,0.75) 0%,transparent 100%);
+  position:relative;z-index:10;
+  flex-shrink:0;
+  gap:8px;
+}
+.hud-left{display:flex;align-items:center;gap:6px;}
+.hud-center{flex:1;text-align:center;}
+.hud-right{display:flex;align-items:center;gap:6px;}
+
+.rec-dot{
+  font-size:9px;color:var(--red);
+  opacity:0;
+  transition:opacity 0.3s;
+}
+.rec-dot.active{
+  opacity:1;
+  animation:blink 1.4s ease-in-out infinite;
+}
+@keyframes blink{0%,100%{opacity:1;}50%{opacity:0.2;}}
+
+.hud-filter-name{
+  font-family:'Bebas Neue',sans-serif;
+  font-size:13px;letter-spacing:0.14em;
+  color:var(--text2);
+  max-width:100px;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+.hud-brand{
+  font-family:'Bebas Neue',sans-serif;
+  font-size:15px;letter-spacing:0.22em;
+  color:var(--accent);
+}
+.hud-flash{
+  font-size:12px;
+  color:var(--text2);
+  letter-spacing:0.1em;
+  font-family:'Bebas Neue',sans-serif;
+}
+.hud-flash.flash-on{color:var(--accent);}
+.hud-counter{
+  font-family:'Bebas Neue',sans-serif;
+  font-size:16px;letter-spacing:0.1em;
+  color:var(--text);
+  white-space:nowrap;
+}
+.hud-counter .sep{color:var(--muted);font-size:12px;}
+
+/* =====================================================
+   VIEWFINDER
+===================================================== */
+.viewfinder{
+  flex:1;position:relative;overflow:hidden;
+  background:#000;
+  min-height:0;
+}
+#video{
+  width:100%;height:100%;
+  object-fit:cover;display:block;
+  transition:filter var(--dur-norm) var(--ease-out);
+}
+#video.mirrored{transform:scaleX(-1);}
+
+/* Overlays */
+.overlay{position:absolute;inset:0;pointer-events:none;}
+
+#vignette{
+  position:absolute;inset:0;pointer-events:none;
+  background:radial-gradient(ellipse at 50% 50%,
+    transparent 55%,rgba(0,0,0,0.55) 100%);
+  transition:opacity var(--dur-norm);
+}
+#grain-canvas{
+  position:absolute;inset:0;
+  pointer-events:none;
+  mix-blend-mode:overlay;
+  opacity:0.5;
+  width:100%;height:100%;
+}
+#flash-overlay{
+  position:absolute;inset:0;pointer-events:none;
+  background:white;
+  opacity:0;
+  transition:opacity 0.05s;
+}
+#focus-ring{
+  position:absolute;
+  width:64px;height:64px;
+  border:2px solid rgba(255,220,80,0.9);
+  border-radius:var(--r-sm);
+  pointer-events:none;
+  opacity:0;
+  transform:translate(-50%,-50%) scale(1.3);
+  transition:opacity 0.2s,transform 0.2s var(--ease-spring);
+}
+#focus-ring.show{
+  opacity:1;transform:translate(-50%,-50%) scale(1);
+}
+.vhs-scanlines{
+  position:absolute;inset:0;pointer-events:none;
+  background:repeating-linear-gradient(
+    0deg,transparent 0,transparent 3px,
+    rgba(0,0,0,0.07) 3px,rgba(0,0,0,0.07) 4px
+  );
+}
+.vhs-track{
+  position:absolute;left:0;right:0;height:2px;
+  background:rgba(255,255,255,0.15);
+  animation:vhs-track 4s linear infinite;
+  pointer-events:none;
+}
+@keyframes vhs-track{from{top:-2px;}to{top:100%;}}
+
+/* Lens reflection */
+.viewfinder::after{
+  content:'';
+  position:absolute;inset:0;
+  background:radial-gradient(ellipse at 22% 18%,
+    rgba(255,255,255,0.04) 0%,transparent 55%);
+  pointer-events:none;
+}
+
+/* Tap to focus hit area */
+.viewfinder-hit{
+  position:absolute;inset:0;
+  cursor:crosshair;
+}
+
+/* Freeze overlay (shown during capture) */
+#freeze-canvas{
+  position:absolute;inset:0;
+  pointer-events:none;
+  opacity:0;
+  width:100%;height:100%;
+  object-fit:cover;
+}
+
+/* =====================================================
+   FILTER STRIP
+===================================================== */
+.filter-strip-wrap{
+  flex-shrink:0;
+  background:linear-gradient(180deg,transparent 0%,rgba(0,0,0,0.6) 100%);
+  padding:6px 0 8px;
+  position:relative;
+  z-index:5;
+}
+#filter-strip{
+  display:flex;gap:8px;
+  overflow-x:auto;
+  scroll-snap-type:x mandatory;
+  -webkit-overflow-scrolling:touch;
+  scrollbar-width:none;
+  padding:4px 16px;
+}
+#filter-strip::-webkit-scrollbar{display:none;}
+
+.filter-item{
+  display:flex;flex-direction:column;align-items:center;gap:4px;
+  flex-shrink:0;
+  scroll-snap-align:center;
+  cursor:pointer;
+  padding:2px;
+  border-radius:var(--r-md);
+  transition:transform var(--dur-fast) var(--ease-spring);
+}
+.filter-item:active{transform:scale(0.93);}
+
+.filter-thumb{
+  width:58px;height:58px;
+  border-radius:10px;
+  overflow:hidden;
+  border:2px solid transparent;
+  transition:border-color var(--dur-fast);
+  position:relative;
+}
+.filter-item.active .filter-thumb{
+  border-color:var(--accent);
+  box-shadow:0 0 0 1px var(--accent-dim);
+}
+.filter-thumb-inner{
+  width:100%;height:100%;
+  background:linear-gradient(180deg,
+    #4A90D9 0%,#87C8E8 35%,
+    #F5C07A 48%,#D4895A 52%,
+    #6DB28A 55%,#3A7D5A 100%);
+}
+.filter-label{
+  font-family:'Bebas Neue',sans-serif;
+  font-size:10px;letter-spacing:0.1em;
+  color:var(--text2);
+  white-space:nowrap;
+  transition:color var(--dur-fast);
+}
+.filter-item.active .filter-label{color:var(--accent);}
+
+/* =====================================================
+   BOTTOM CONTROLS
+===================================================== */
+.controls{
+  flex-shrink:0;
+  display:flex;align-items:center;justify-content:space-around;
+  padding:12px 8px;
+  padding-bottom:max(16px, env(safe-area-inset-bottom));
+  background:var(--body);
+  border-top:1px solid var(--border);
+  position:relative;z-index:10;
+}
+.ctrl-btn{
+  display:flex;flex-direction:column;align-items:center;gap:4px;
+  width:52px;height:52px;
+  border-radius:var(--r-md);
+  color:var(--text2);
+  padding:4px;
+  transition:color var(--dur-fast),background var(--dur-fast),
+             transform var(--dur-fast) var(--ease-spring);
+}
+.ctrl-btn:hover{color:var(--text);background:var(--surface);}
+.ctrl-btn:active{transform:scale(0.92);}
+.ctrl-btn.active-state{color:var(--accent);}
+.ctrl-btn svg{flex-shrink:0;}
+.ctrl-label{
+  font-family:'Bebas Neue',sans-serif;
+  font-size:9px;letter-spacing:0.1em;
+}
+
+/* Shutter */
+.shutter-wrap{display:flex;align-items:center;justify-content:center;}
+.shutter-btn{
+  width:72px;height:72px;
+  border-radius:50%;
+  position:relative;
+  padding:0;
+  transition:transform var(--dur-fast) var(--ease-spring);
+}
+.shutter-btn:active{transform:scale(0.93);}
+.shutter-outer{
+  position:absolute;inset:0;
+  border-radius:50%;
+  border:3px solid rgba(255,255,255,0.6);
+}
+.shutter-inner{
+  position:absolute;
+  inset:6px;
+  border-radius:50%;
+  background:var(--shutter);
+  transition:background var(--dur-fast),transform var(--dur-fast);
+  box-shadow:inset 0 2px 4px rgba(0,0,0,0.15),
+             0 2px 8px rgba(255,255,255,0.1);
+}
+.shutter-btn:active .shutter-inner{
+  background:#d8d4cf;
+  transform:scale(0.95);
+}
+.shutter-btn.capturing .shutter-inner{background:#b0acaa;}
+
+/* Timer badge on shutter */
+.shutter-timer-badge{
+  position:absolute;top:-4px;right:-4px;
+  width:18px;height:18px;
+  border-radius:50%;
+  background:var(--accent);
+  color:#111;
+  font-family:'Bebas Neue',sans-serif;
+  font-size:10px;
+  display:flex;align-items:center;justify-content:center;
+  letter-spacing:0;
+  pointer-events:none;
+}
+.shutter-timer-badge.hidden{display:none;}
+
+/* =====================================================
+   GALLERY MODAL
+===================================================== */
+.modal{
+  position:fixed;inset:0;
+  background:var(--bg);
+  z-index:500;
+  display:flex;flex-direction:column;
+  transform:translateY(100%);
+  transition:transform var(--dur-slow) var(--ease-out);
+  overflow:hidden;
+}
+.modal.open{transform:translateY(0);}
+@media(min-width:600px){
+  .modal{
+    position:absolute;
+    border-radius:var(--r-xl);
+    overflow:hidden;
+  }
+}
+
+.modal-header{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:16px 20px 12px;
+  padding-top:max(16px, env(safe-area-inset-top));
+  border-bottom:1px solid var(--border);
+  flex-shrink:0;
+}
+.modal-header h2{
+  font-family:'Bebas Neue',sans-serif;
+  font-size:22px;letter-spacing:0.16em;
+  color:var(--text);
+}
+.modal-close{
+  width:36px;height:36px;
+  border-radius:50%;
+  background:var(--surface2);
+  display:flex;align-items:center;justify-content:center;
+  font-size:20px;color:var(--text2);
+  transition:color var(--dur-fast),background var(--dur-fast);
+}
+.modal-close:hover{background:var(--surface);color:var(--text);}
+
+/* Gallery grid */
+.gallery-scroll{flex:1;overflow-y:auto;padding:2px;}
+.gallery-scroll::-webkit-scrollbar{width:4px;}
+.gallery-scroll::-webkit-scrollbar-thumb{background:var(--surface2);border-radius:2px;}
+.gallery-grid{
+  display:grid;
+  grid-template-columns:repeat(3,1fr);
+  gap:2px;
+}
+.gallery-thumb{
+  aspect-ratio:1;overflow:hidden;
+  position:relative;cursor:pointer;
+}
+.gallery-thumb img{
+  width:100%;height:100%;
+  object-fit:cover;
+  transition:transform 0.2s;
+}
+.gallery-thumb:hover img{transform:scale(1.04);}
+.gallery-thumb-num{
+  position:absolute;bottom:4px;left:4px;
+  font-family:'Bebas Neue',sans-serif;
+  font-size:11px;letter-spacing:0.08em;
+  color:rgba(255,255,255,0.85);
+  background:rgba(0,0,0,0.5);
+  padding:1px 4px;border-radius:3px;
+}
+.gallery-empty{
+  flex:1;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;gap:12px;
+  padding:40px;text-align:center;
+  color:var(--muted);
+}
+.gallery-empty-icon{font-size:48px;opacity:0.5;}
+.gallery-empty p{
+  font-family:'Bebas Neue',sans-serif;
+  font-size:16px;letter-spacing:0.12em;
+}
+.gallery-empty small{font-size:12px;font-family:'DM Sans',sans-serif;}
+
+/* Gallery roll header */
+.gallery-roll-header{
+  grid-column:1/-1;
+  padding:10px 12px 6px;
+  font-family:'Bebas Neue',sans-serif;
+  font-size:13px;letter-spacing:0.14em;
+  color:var(--text2);
+  background:var(--surface);
+  border-top:1px solid var(--border);
+}
+
+/* =====================================================
+   PHOTO VIEWER
+===================================================== */
+#photo-viewer{
+  background:#000;
+  align-items:center;justify-content:center;
+}
+.viewer-topbar{
+  position:absolute;top:0;left:0;right:0;
+  display:flex;align-items:center;justify-content:space-between;
+  padding:16px;
+  padding-top:max(16px, env(safe-area-inset-top));
+  background:linear-gradient(180deg,rgba(0,0,0,0.7) 0%,transparent 100%);
+  z-index:10;
+}
+.viewer-back{
+  width:40px;height:40px;
+  border-radius:50%;
+  background:rgba(0,0,0,0.4);
+  display:flex;align-items:center;justify-content:center;
+  color:white;font-size:20px;
+}
+.viewer-title{
+  font-family:'Bebas Neue',sans-serif;
+  font-size:14px;letter-spacing:0.14em;
+  color:rgba(255,255,255,0.8);
+}
+.viewer-img-wrap{
+  width:100%;height:100%;
+  display:flex;align-items:center;justify-content:center;
+}
+#viewer-img{
+  width:100%;height:100%;
+  object-fit:contain;
+}
+.viewer-controls{
+  position:absolute;bottom:0;left:0;right:0;
+  display:flex;justify-content:space-around;align-items:center;
+  padding:20px 16px;
+  padding-bottom:max(24px, env(safe-area-inset-bottom));
+  background:linear-gradient(0deg,rgba(0,0,0,0.8) 0%,transparent 100%);
+  z-index:10;
+}
+.viewer-ctrl{
+  display:flex;flex-direction:column;align-items:center;gap:6px;
+  color:white;padding:8px 16px;
+  transition:opacity var(--dur-fast);
+}
+.viewer-ctrl:active{opacity:0.6;}
+.viewer-ctrl svg{opacity:0.9;}
+.viewer-ctrl-label{
+  font-size:10px;letter-spacing:0.1em;
+  color:rgba(255,255,255,0.7);
+  font-family:'Bebas Neue',sans-serif;
+}
+.viewer-ctrl.danger{color:var(--red);}
+
+/* =====================================================
+   SETTINGS PANEL
+===================================================== */
+#settings-panel{
+  position:fixed;inset:0;
+  z-index:600;
+  transform:translateX(100%);
+  transition:transform var(--dur-slow) var(--ease-out);
+  background:var(--bg);
+  display:flex;flex-direction:column;
+  overflow:hidden;
+}
+#settings-panel.open{transform:translateX(0);}
+@media(min-width:600px){
+  #settings-panel{position:absolute;border-radius:var(--r-xl);}
+}
+.settings-scroll{flex:1;overflow-y:auto;padding:0 0 32px;}
+.settings-scroll::-webkit-scrollbar{width:4px;}
+.settings-scroll::-webkit-scrollbar-thumb{background:var(--surface2);}
+
+.settings-section{
+  padding:20px 20px 4px;
+}
+.settings-section-title{
+  font-family:'Bebas Neue',sans-serif;
+  font-size:12px;letter-spacing:0.2em;
+  color:var(--accent);
+  margin-bottom:12px;
+}
+.settings-row{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:12px 0;
+  border-bottom:1px solid var(--border);
+}
+.settings-row:last-child{border-bottom:none;}
+.settings-row-label{
+  font-size:14px;font-weight:500;
+  color:var(--text);
+}
+.settings-row-sub{
+  font-size:11px;color:var(--text2);margin-top:2px;
+}
+
+/* Toggle switch */
+.toggle{
+  position:relative;width:44px;height:26px;flex-shrink:0;
+}
+.toggle input{opacity:0;width:0;height:0;position:absolute;}
+.toggle-track{
+  position:absolute;inset:0;
+  border-radius:var(--r-full);
+  background:var(--surface2);
+  transition:background var(--dur-norm);
+  cursor:pointer;
+}
+.toggle input:checked + .toggle-track{background:var(--accent);}
+.toggle-thumb{
+  position:absolute;
+  top:3px;left:3px;
+  width:20px;height:20px;
+  border-radius:50%;
+  background:white;
+  box-shadow:0 1px 4px rgba(0,0,0,0.4);
+  transition:transform var(--dur-norm) var(--ease-spring);
+  pointer-events:none;
+}
+.toggle input:checked ~ .toggle-thumb{transform:translateX(18px);}
+
+/* Segmented control */
+.seg-ctrl{
+  display:flex;
+  background:var(--surface2);
+  border-radius:var(--r-sm);
+  padding:2px;gap:2px;
+}
+.seg-btn{
+  font-family:'Bebas Neue',sans-serif;
+  font-size:12px;letter-spacing:0.1em;
+  padding:5px 10px;
+  border-radius:4px;
+  color:var(--text2);
+  transition:all var(--dur-fast);
+  white-space:nowrap;
+}
+.seg-btn.active{
+  background:var(--surface);
+  color:var(--accent);
+}
+
+/* =====================================================
+   FILM ROLL MODAL
+===================================================== */
+#roll-modal{
+  position:fixed;inset:0;
+  z-index:700;
+  background:rgba(0,0,0,0.85);
+  backdrop-filter:blur(8px);
+  display:flex;align-items:center;justify-content:center;
+  opacity:0;pointer-events:none;
+  transition:opacity var(--dur-norm);
+  padding:24px;
+}
+#roll-modal.open{opacity:1;pointer-events:all;}
+@media(min-width:600px){#roll-modal{position:absolute;border-radius:var(--r-xl);}}
+.roll-card{
+  background:var(--body);
+  border:1px solid var(--border2);
+  border-radius:var(--r-xl);
+  padding:36px 28px;
+  text-align:center;
+  max-width:300px;width:100%;
+  animation:popUp var(--dur-slow) var(--ease-spring) both;
+}
+@keyframes popUp{from{transform:scale(0.85);opacity:0;}to{transform:scale(1);opacity:1;}}
+.roll-film-icon{
+  font-size:52px;margin-bottom:16px;
+  display:block;
+}
+.roll-title{
+  font-family:'Bebas Neue',sans-serif;
+  font-size:32px;letter-spacing:0.16em;
+  color:var(--accent);margin-bottom:4px;
+}
+.roll-subtitle{
+  font-family:'Bebas Neue',sans-serif;
+  font-size:16px;letter-spacing:0.2em;
+  color:var(--text2);margin-bottom:8px;
+}
+.roll-count{
+  font-size:13px;color:var(--muted);
+  margin-bottom:28px;
+}
+.roll-actions{display:flex;flex-direction:column;gap:10px;}
+.btn-new-roll{
+  background:var(--accent);
+  color:#111;
+  font-family:'Bebas Neue',sans-serif;
+  font-size:18px;letter-spacing:0.14em;
+  padding:14px;border-radius:var(--r-full);
+  transition:transform var(--dur-fast) var(--ease-spring);
+}
+.btn-new-roll:active{transform:scale(0.96);}
+.btn-view-roll{
+  background:var(--surface);
+  color:var(--text);
+  font-family:'Bebas Neue',sans-serif;
+  font-size:16px;letter-spacing:0.12em;
+  padding:12px;border-radius:var(--r-full);
+  border:1px solid var(--border2);
+}
+
+/* =====================================================
+   COUNTDOWN OVERLAY
+===================================================== */
+#countdown-overlay{
+  position:fixed;inset:0;
+  z-index:800;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  background:rgba(0,0,0,0.5);
+  pointer-events:none;
+}
+@media(min-width:600px){#countdown-overlay{position:absolute;border-radius:var(--r-xl);}}
+.countdown-num{
+  font-family:'Bebas Neue',sans-serif;
+  font-size:clamp(100px,30vw,160px);
+  color:white;
+  text-shadow:0 0 40px rgba(255,255,255,0.5);
+  animation:countPop 0.4s var(--ease-spring) both;
+  line-height:1;
+}
+.countdown-cancel{
+  margin-top:24px;
+  font-family:'Bebas Neue',sans-serif;
+  font-size:14px;letter-spacing:0.16em;
+  color:rgba(255,255,255,0.6);
+  pointer-events:all;
+}
+@keyframes countPop{from{transform:scale(1.5);opacity:0;}to{transform:scale(1);opacity:1;}}
+
+/* =====================================================
+   TOAST SYSTEM
+===================================================== */
+#toast-container{
+  position:fixed;
+  top:max(16px, env(safe-area-inset-top));
+  left:50%;transform:translateX(-50%);
+  z-index:9999;
+  display:flex;flex-direction:column;align-items:center;gap:8px;
+  pointer-events:none;
+}
+@media(min-width:600px){#toast-container{position:absolute;}}
+.toast{
+  background:rgba(255,255,255,0.95);
+  color:#111;
+  padding:10px 18px;
+  border-radius:var(--r-full);
+  font-size:13px;font-weight:600;
+  white-space:nowrap;
+  opacity:0;
+  transform:translateY(-8px) scale(0.95);
+  transition:opacity 0.2s,transform 0.2s var(--ease-spring);
+  pointer-events:none;
+  box-shadow:0 4px 20px rgba(0,0,0,0.3);
+}
+.toast.show{opacity:1;transform:translateY(0) scale(1);}
+.toast.toast-error{background:var(--red);color:white;}
+.toast.toast-success{background:#22c55e;color:white;}
+.toast.toast-warn{background:var(--orange);color:white;}
+
+/* =====================================================
+   PHOTO SAVED ANIMATION
+===================================================== */
+.photo-saved-thumb{
+  position:fixed;bottom:120px;right:20px;
+  width:56px;height:56px;
+  border-radius:10px;
+  overflow:hidden;
+  border:2px solid var(--accent);
+  box-shadow:0 4px 16px rgba(0,0,0,0.5);
+  opacity:0;
+  transform:scale(0.6) translateY(20px);
+  transition:opacity 0.25s,transform 0.25s var(--ease-spring);
+  z-index:200;
+  pointer-events:none;
+}
+.photo-saved-thumb.show{opacity:1;transform:scale(1) translateY(0);}
+.photo-saved-thumb img{width:100%;height:100%;object-fit:cover;}
+@media(min-width:600px){.photo-saved-thumb{position:absolute;}}
+
+/* =====================================================
+   MISC UTILITY
+===================================================== */
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px;}
+@media(prefers-reduced-motion:reduce){
+  *{animation-duration:0.01ms!important;transition-duration:0.01ms!important;}
+}
+
+/* Camera body noise texture (subtle) */
+.controls::before{
+  content:'';
+  position:absolute;inset:0;
+  opacity:0.03;
+  background-image:url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='200' height='200'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4'/><feColorMatrix type='saturate' values='0'/></filter><rect width='200' height='200' filter='url(%23n)'/></svg>");
+  pointer-events:none;
+}
+</style>
+</head>
+<body>
+
+<!-- =====================================================
+     WELCOME / PERMISSION SCREEN
+===================================================== -->
+<div id="welcome">
+  <div class="welcome-inner">
+    <div class="welcome-film-strip">
+      <div class="film-hole"></div>
+      <div class="film-hole"></div>
+      <div class="film-hole"></div>
+      <div class="film-hole"></div>
+      <div class="film-hole"></div>
+    </div>
+    <h1 class="welcome-logo">DISPO<span>S</span>ABLE</h1>
+    <p class="welcome-tagline">Film Camera · In Your Browser</p>
+    <div id="loading-ring" class="loading-ring hidden"></div>
+    <button id="btn-allow" class="btn-allow" aria-label="Allow camera access and start camera">
+      START SHOOTING
+    </button>
+    <div id="permission-denied" class="permission-denied hidden">
+      <p><strong>Camera access is blocked.</strong></p>
+      <p>Go to <strong>Settings → Site Settings → Camera</strong> and allow access for this page, then reload.</p>
+    </div>
+  </div>
+</div>
+
+<!-- =====================================================
+     MAIN APP
+===================================================== -->
+<div id="app" class="hidden">
+
+  <!-- HUD -->
+  <div class="hud">
+    <div class="hud-left">
+      <span id="rec-dot" class="rec-dot" aria-hidden="true">●</span>
+      <span id="hud-filter-name" class="hud-filter-name">KODAK GOLD</span>
+    </div>
+    <div class="hud-center">
+      <span class="hud-brand">DISPOSABLE</span>
+    </div>
+    <div class="hud-right">
+      <span id="hud-flash" class="hud-flash">AUTO</span>
+      <span id="hud-counter" class="hud-counter">27<span class="sep">/</span>27</span>
+    </div>
+  </div>
+
+  <!-- Viewfinder -->
+  <div class="viewfinder" id="viewfinder">
+    <video id="video" autoplay muted playsinline></video>
+    <canvas id="grain-canvas"></canvas>
+    <div id="vignette"></div>
+    <div id="flash-overlay"></div>
+    <canvas id="freeze-canvas"></canvas>
+    <div id="focus-ring" aria-hidden="true"></div>
+    <!-- VHS overlay (only visible when VHS filter active) -->
+    <div id="vhs-overlay" class="hidden">
+      <div class="vhs-scanlines"></div>
+      <div class="vhs-track"></div>
+    </div>
+    <!-- Tap area for focus -->
+    <div class="viewfinder-hit" id="viewfinder-hit" aria-label="Tap to focus" role="button" tabindex="0"></div>
+  </div>
+
+  <!-- Filter strip -->
+  <div class="filter-strip-wrap">
+    <div id="filter-strip" role="listbox" aria-label="Filter selector"></div>
+  </div>
+
+  <!-- Bottom controls -->
+  <div class="controls" role="toolbar" aria-label="Camera controls">
+    <!-- Gallery -->
+    <button class="ctrl-btn" id="btn-gallery" aria-label="Open photo gallery">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor">
+        <rect x="2" y="2" width="9" height="9" rx="1.5"/>
+        <rect x="13" y="2" width="9" height="9" rx="1.5"/>
+        <rect x="2" y="13" width="9" height="9" rx="1.5"/>
+        <rect x="13" y="13" width="9" height="9" rx="1.5"/>
+      </svg>
+      <span class="ctrl-label">GALLERY</span>
+    </button>
+
+    <!-- Timer -->
+    <button class="ctrl-btn" id="btn-timer" aria-label="Self timer off">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="13" r="8"/>
+        <path d="M12 9v4l2.5 2.5"/>
+        <path d="M9 2h6M12 2v3"/>
+      </svg>
+      <span class="ctrl-label" id="timer-label">OFF</span>
+    </button>
+
+    <!-- Shutter -->
+    <div class="shutter-wrap">
+      <button class="shutter-btn" id="btn-shutter" aria-label="Take photo">
+        <div class="shutter-outer"></div>
+        <div class="shutter-inner"></div>
+        <div class="shutter-timer-badge hidden" id="timer-badge"></div>
+      </button>
+    </div>
+
+    <!-- Flip -->
+    <button class="ctrl-btn" id="btn-flip" aria-label="Switch camera">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M20 7l-4-4-4 4M16 3v13"/>
+        <path d="M4 17l4 4 4-4M8 21V8"/>
+      </svg>
+      <span class="ctrl-label">FLIP</span>
+    </button>
+
+    <!-- Settings -->
+    <button class="ctrl-btn" id="btn-settings" aria-label="Open settings">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="3"/>
+        <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+      </svg>
+      <span class="ctrl-label">SETTINGS</span>
+    </button>
+  </div>
+</div><!-- /#app -->
+
+<!-- =====================================================
+     GALLERY MODAL
+===================================================== -->
+<div id="gallery-modal" class="modal" role="dialog" aria-modal="true" aria-label="Photo gallery">
+  <div class="modal-header">
+    <h2>GALLERY</h2>
+    <button class="modal-close" id="btn-gallery-close" aria-label="Close gallery">×</button>
+  </div>
+  <div class="gallery-scroll" id="gallery-scroll">
+    <div class="gallery-grid" id="gallery-grid"></div>
+    <div class="gallery-empty hidden" id="gallery-empty">
+      <span class="gallery-empty-icon">🎞</span>
+      <p>NO PHOTOS YET</p>
+      <small>Start shooting to fill your roll</small>
+    </div>
+  </div>
+</div>
+
+<!-- =====================================================
+     PHOTO VIEWER
+===================================================== -->
+<div id="photo-viewer" class="modal" role="dialog" aria-modal="true" aria-label="Photo viewer">
+  <div class="viewer-topbar">
+    <button class="viewer-back" id="btn-viewer-back" aria-label="Back to gallery">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
+    </button>
+    <span class="viewer-title" id="viewer-title">DISPOSABLE_001</span>
+    <div style="width:40px"></div>
+  </div>
+  <div class="viewer-img-wrap">
+    <img id="viewer-img" src="" alt="Captured photo"/>
+  </div>
+  <div class="viewer-controls">
+    <button class="viewer-ctrl" id="btn-viewer-share" aria-label="Share photo">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="M8.59 13.51l6.83 3.98M15.41 6.51L8.59 10.49"/></svg>
+      <span class="viewer-ctrl-label">SHARE</span>
+    </button>
+    <button class="viewer-ctrl" id="btn-viewer-download" aria-label="Download photo">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+      <span class="viewer-ctrl-label">SAVE</span>
+    </button>
+    <button class="viewer-ctrl danger" id="btn-viewer-delete" aria-label="Delete photo">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/></svg>
+      <span class="viewer-ctrl-label">DELETE</span>
+    </button>
+  </div>
+</div>
+
+<!-- =====================================================
+     SETTINGS PANEL
+===================================================== -->
+<div id="settings-panel" role="dialog" aria-modal="true" aria-label="Settings">
+  <div class="modal-header">
+    <h2>SETTINGS</h2>
+    <button class="modal-close" id="btn-settings-close" aria-label="Close settings">×</button>
+  </div>
+  <div class="settings-scroll">
+
+    <!-- CAMERA -->
+    <div class="settings-section">
+      <div class="settings-section-title">CAMERA</div>
+      <div class="settings-row">
+        <div><div class="settings-row-label">Aspect Ratio</div></div>
+        <div class="seg-ctrl" id="seg-aspect">
+          <button class="seg-btn" data-val="4:3">4:3</button>
+          <button class="seg-btn" data-val="16:9">16:9</button>
+          <button class="seg-btn" data-val="1:1">1:1</button>
+        </div>
+      </div>
+      <div class="settings-row">
+        <div><div class="settings-row-label">Mirror Selfie</div><div class="settings-row-sub">Flip front camera</div></div>
+        <label class="toggle" aria-label="Mirror selfie toggle">
+          <input type="checkbox" id="tog-mirror">
+          <div class="toggle-track"></div>
+          <div class="toggle-thumb"></div>
+        </label>
+      </div>
+    </div>
+
+    <!-- FILM -->
+    <div class="settings-section">
+      <div class="settings-section-title">FILM</div>
+      <div class="settings-row">
+        <div><div class="settings-row-label">Roll Size</div></div>
+        <div class="seg-ctrl" id="seg-roll">
+          <button class="seg-btn" data-val="12">12</button>
+          <button class="seg-btn" data-val="24">24</button>
+          <button class="seg-btn active" data-val="27">27</button>
+          <button class="seg-btn" data-val="36">36</button>
+        </div>
+      </div>
+      <div class="settings-row">
+        <div><div class="settings-row-label">Grain Level</div></div>
+        <div class="seg-ctrl" id="seg-grain">
+          <button class="seg-btn" data-val="none">NONE</button>
+          <button class="seg-btn active" data-val="low">LOW</button>
+          <button class="seg-btn" data-val="medium">MED</button>
+          <button class="seg-btn" data-val="high">HIGH</button>
+        </div>
+      </div>
+      <div class="settings-row">
+        <div><div class="settings-row-label">Flash Mode</div></div>
+        <div class="seg-ctrl" id="seg-flash">
+          <button class="seg-btn active" data-val="auto">AUTO</button>
+          <button class="seg-btn" data-val="on">ON</button>
+          <button class="seg-btn" data-val="off">OFF</button>
+        </div>
+      </div>
+      <div class="settings-row">
+        <div><div class="settings-row-label">Random Film</div><div class="settings-row-sub">Subtle per-shot variation</div></div>
+        <label class="toggle" aria-label="Random film mode toggle">
+          <input type="checkbox" id="tog-random">
+          <div class="toggle-track"></div>
+          <div class="toggle-thumb"></div>
+        </label>
+      </div>
+    </div>
+
+    <!-- DATE STAMP -->
+    <div class="settings-section">
+      <div class="settings-section-title">DATE STAMP</div>
+      <div class="settings-row">
+        <div><div class="settings-row-label">Stamp Mode</div></div>
+        <div class="seg-ctrl" id="seg-datestamp">
+          <button class="seg-btn active" data-val="off">OFF</button>
+          <button class="seg-btn" data-val="date">DATE</button>
+          <button class="seg-btn" data-val="datetime">D+T</button>
+        </div>
+      </div>
+      <div class="settings-row">
+        <div><div class="settings-row-label">Date Format</div></div>
+        <div class="seg-ctrl" id="seg-datefmt">
+          <button class="seg-btn active" data-val="mdy">M/D/Y</button>
+          <button class="seg-btn" data-val="dmy">D/M/Y</button>
+          <button class="seg-btn" data-val="ymd">Y/M/D</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- SELF TIMER -->
+    <div class="settings-section">
+      <div class="settings-section-title">SELF TIMER</div>
+      <div class="settings-row">
+        <div><div class="settings-row-label">Timer Duration</div></div>
+        <div class="seg-ctrl" id="seg-timer">
+          <button class="seg-btn active" data-val="0">OFF</button>
+          <button class="seg-btn" data-val="3">3s</button>
+          <button class="seg-btn" data-val="5">5s</button>
+          <button class="seg-btn" data-val="10">10s</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- SOUND -->
+    <div class="settings-section">
+      <div class="settings-section-title">SOUND &amp; FEEL</div>
+      <div class="settings-row">
+        <div><div class="settings-row-label">Shutter Sound</div></div>
+        <label class="toggle" aria-label="Shutter sound toggle">
+          <input type="checkbox" id="tog-sound" checked>
+          <div class="toggle-track"></div>
+          <div class="toggle-thumb"></div>
+        </label>
+      </div>
+      <div class="settings-row">
+        <div><div class="settings-row-label">Vibration</div><div class="settings-row-sub">Haptic feedback on shutter</div></div>
+        <label class="toggle" aria-label="Vibration toggle">
+          <input type="checkbox" id="tog-vibration" checked>
+          <div class="toggle-track"></div>
+          <div class="toggle-thumb"></div>
+        </label>
+      </div>
+    </div>
+
+    <!-- ROLL MANAGEMENT -->
+    <div class="settings-section">
+      <div class="settings-section-title">FILM ROLL</div>
+      <div class="settings-row">
+        <div>
+          <div class="settings-row-label">Start New Roll</div>
+          <div class="settings-row-sub">Keeps existing gallery photos</div>
+        </div>
+        <button id="btn-new-roll-settings" style="font-family:'Bebas Neue',sans-serif;font-size:13px;letter-spacing:0.12em;color:var(--accent);padding:6px 14px;border:1px solid var(--accent-dim);border-radius:var(--r-full);">NEW ROLL</button>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- =====================================================
+     FILM ROLL FINISHED MODAL
+===================================================== -->
+<div id="roll-modal">
+  <div class="roll-card">
+    <span class="roll-film-icon">🎞</span>
+    <div class="roll-title">FILM ROLL</div>
+    <div class="roll-subtitle">FINISHED</div>
+    <div class="roll-count" id="roll-count-text">27 shots taken</div>
+    <div class="roll-actions">
+      <button class="btn-new-roll" id="btn-new-roll">START NEW ROLL</button>
+      <button class="btn-view-roll" id="btn-view-gallery-roll">VIEW PHOTOS</button>
+    </div>
+  </div>
+</div>
+
+<!-- =====================================================
+     COUNTDOWN OVERLAY
+===================================================== -->
+<div id="countdown-overlay" class="hidden">
+  <div class="countdown-num" id="countdown-num">3</div>
+  <button class="countdown-cancel" id="btn-cancel-timer">TAP TO CANCEL</button>
+</div>
+
+<!-- =====================================================
+     TOAST CONTAINER
+===================================================== -->
+<div id="toast-container" aria-live="polite" aria-atomic="false"></div>
+
+<!-- Photo saved thumbnail -->
+<div class="photo-saved-thumb" id="photo-saved-thumb">
+  <img id="photo-saved-img" src="" alt=""/>
+</div>
+
+<!-- Hidden processing canvas -->
+<canvas id="proc-canvas" style="display:none;" width="1" height="1"></canvas>
+
+<script>
+'use strict';
+
+/* ==========================================================
+   SECTION 1: FILTER DEFINITIONS
+   Each filter has: id, name, category, css (for live preview),
+   params (for canvas pixel processing on capture)
+========================================================== */
+const FILTERS = [
+  { id:'original',    name:'Original',     cat:'original',
+    css:'none',
+    p:{br:1,ct:1,sat:1,tmp:0,r:0,g:0,b:0,grain:0.05,vig:0.2} },
+
+  // ── KODAK SERIES ──
+  { id:'kodak-gold',  name:'Kodak Gold',   cat:'kodak',
+    css:'brightness(1.05) contrast(1.15) saturate(1.4) sepia(0.15)',
+    p:{br:1.05,ct:1.15,sat:1.4,tmp:10,r:10,g:4,b:-8,grain:0.12,vig:0.28} },
+  { id:'kodak-portra',name:'Portra 400',   cat:'kodak',
+    css:'brightness(1.05) contrast(0.95) saturate(0.9) hue-rotate(5deg)',
+    p:{br:1.05,ct:0.95,sat:0.9,tmp:5,r:7,g:4,b:0,grain:0.08,vig:0.2} },
+  { id:'kodak-colorplus',name:'ColorPlus', cat:'kodak',
+    css:'brightness(1.0) contrast(1.2) saturate(1.6) hue-rotate(-3deg)',
+    p:{br:1.0,ct:1.2,sat:1.6,tmp:8,r:6,g:3,b:-6,grain:0.1,vig:0.25} },
+  { id:'kodak-ultramax',name:'Ultramax',   cat:'kodak',
+    css:'brightness(1.08) contrast(1.1) saturate(1.3)',
+    p:{br:1.08,ct:1.1,sat:1.3,tmp:3,r:3,g:2,b:0,grain:0.09,vig:0.2} },
+  { id:'kodak-ektar',  name:'Ektar 100',   cat:'kodak',
+    css:'brightness(0.98) contrast(1.25) saturate(1.7) hue-rotate(-5deg)',
+    p:{br:0.98,ct:1.25,sat:1.7,tmp:0,r:10,g:-2,b:-5,grain:0.06,vig:0.3} },
+  { id:'kodak-vision3',name:'Vision3',     cat:'kodak',
+    css:'brightness(1.02) contrast(1.1) saturate(1.1) sepia(0.1)',
+    p:{br:1.02,ct:1.1,sat:1.1,tmp:6,r:5,g:3,b:-3,grain:0.1,vig:0.35} },
+  { id:'kodak-proimage',name:'Pro Image',  cat:'kodak',
+    css:'brightness(1.05) contrast(1.05) saturate(1.2) sepia(0.18)',
+    p:{br:1.05,ct:1.05,sat:1.2,tmp:12,r:12,g:5,b:-4,grain:0.07,vig:0.25} },
+
+  // ── DISPOSABLE SERIES ──
+  { id:'disp-warm',   name:'Disp. Warm',   cat:'disposable',
+    css:'brightness(1.1) contrast(1.2) saturate(1.3) sepia(0.3)',
+    p:{br:1.1,ct:1.2,sat:1.3,tmp:20,r:20,g:8,b:-15,grain:0.18,vig:0.4} },
+  { id:'disp-cool',   name:'Disp. Cool',   cat:'disposable',
+    css:'brightness(1.05) contrast(1.15) saturate(1.2) hue-rotate(-10deg)',
+    p:{br:1.05,ct:1.15,sat:1.2,tmp:-15,r:-10,g:0,b:15,grain:0.15,vig:0.3} },
+  { id:'disp-flash',  name:'Disp. Flash',  cat:'disposable',
+    css:'brightness(1.35) contrast(1.05) saturate(1.05)',
+    p:{br:1.35,ct:1.05,sat:1.05,tmp:5,r:5,g:3,b:0,grain:0.2,vig:0.5} },
+  { id:'disp-night',  name:'Disp. Night',  cat:'disposable',
+    css:'brightness(0.7) contrast(1.35) saturate(0.85)',
+    p:{br:0.7,ct:1.35,sat:0.85,tmp:0,r:0,g:0,b:0,grain:0.32,vig:0.55} },
+  { id:'disp-party',  name:'Disp. Party',  cat:'disposable',
+    css:'brightness(1.15) contrast(1.25) saturate(1.5) sepia(0.08)',
+    p:{br:1.15,ct:1.25,sat:1.5,tmp:14,r:14,g:5,b:-10,grain:0.2,vig:0.4} },
+  { id:'disp-summer', name:'Disp. Summer', cat:'disposable',
+    css:'brightness(1.2) contrast(1.05) saturate(1.65) hue-rotate(-8deg)',
+    p:{br:1.2,ct:1.05,sat:1.65,tmp:18,r:18,g:8,b:-12,grain:0.1,vig:0.2} },
+
+  // ── FILM SERIES ──
+  { id:'classic-film',name:'Classic Film', cat:'film',
+    css:'brightness(1.0) contrast(1.1) saturate(1.1) sepia(0.1)',
+    p:{br:1.0,ct:1.1,sat:1.1,tmp:5,r:5,g:3,b:-2,grain:0.15,vig:0.3} },
+  { id:'vintage-film',name:'Vintage Film', cat:'film',
+    css:'brightness(0.95) contrast(1.05) saturate(0.75) sepia(0.35)',
+    p:{br:0.95,ct:1.05,sat:0.75,tmp:15,r:20,g:10,b:-5,grain:0.22,vig:0.45} },
+  { id:'90s-film',    name:'90s Film',     cat:'film',
+    css:'brightness(1.08) contrast(1.15) saturate(1.35) sepia(0.08)',
+    p:{br:1.08,ct:1.15,sat:1.35,tmp:8,r:8,g:4,b:-5,grain:0.18,vig:0.32} },
+  { id:'2000s-film',  name:'2000s Film',   cat:'film',
+    css:'brightness(1.05) contrast(1.1) saturate(1.2) hue-rotate(5deg)',
+    p:{br:1.05,ct:1.1,sat:1.2,tmp:-5,r:-5,g:5,b:3,grain:0.12,vig:0.28} },
+  { id:'faded-film',  name:'Faded Film',   cat:'film',
+    css:'brightness(1.15) contrast(0.85) saturate(0.7) sepia(0.2)',
+    p:{br:1.15,ct:0.85,sat:0.7,tmp:10,r:15,g:10,b:5,grain:0.15,vig:0.25,fade:0.12} },
+  { id:'soft-film',   name:'Soft Film',    cat:'film',
+    css:'brightness(1.1) contrast(0.9) saturate(0.9) sepia(0.05)',
+    p:{br:1.1,ct:0.9,sat:0.9,tmp:8,r:8,g:5,b:3,grain:0.08,vig:0.2} },
+  { id:'grainy-film', name:'Grainy Film',  cat:'film',
+    css:'brightness(0.95) contrast(1.2) saturate(0.9)',
+    p:{br:0.95,ct:1.2,sat:0.9,tmp:3,r:3,g:2,b:0,grain:0.42,vig:0.35} },
+  { id:'cinema-film', name:'Cinema Film',  cat:'film',
+    css:'brightness(1.0) contrast(1.15) saturate(1.05) sepia(0.12)',
+    p:{br:1.0,ct:1.15,sat:1.05,tmp:8,r:8,g:3,b:-2,grain:0.12,vig:0.5} },
+
+  // ── SPECIAL SERIES ──
+  { id:'bw',          name:'B & W',        cat:'special',
+    css:'grayscale(1) contrast(1.1)',
+    p:{br:1.0,ct:1.1,sat:0,tmp:0,r:0,g:0,b:0,grain:0.2,vig:0.4,bw:true} },
+  { id:'sepia-tone',  name:'Sepia',        cat:'special',
+    css:'sepia(1) brightness(1.05)',
+    p:{br:1.05,ct:1.0,sat:0,tmp:0,r:0,g:0,b:0,grain:0.18,vig:0.4,sepia:true} },
+  { id:'polaroid',    name:'Polaroid',     cat:'special',
+    css:'brightness(1.1) contrast(0.9) saturate(1.1) hue-rotate(5deg)',
+    p:{br:1.1,ct:0.9,sat:1.1,tmp:5,r:10,g:5,b:0,grain:0.06,vig:0.12,fade:0.18} },
+  { id:'dreamy',      name:'Dreamy',       cat:'special',
+    css:'brightness(1.15) contrast(0.85) saturate(1.3) hue-rotate(10deg)',
+    p:{br:1.15,ct:0.85,sat:1.3,tmp:5,r:5,g:5,b:10,grain:0.06,vig:0.3} },
+  { id:'retro',       name:'Retro',        cat:'special',
+    css:'brightness(1.05) contrast(1.1) saturate(0.85) sepia(0.25)',
+    p:{br:1.05,ct:1.1,sat:0.85,tmp:12,r:18,g:10,b:-5,grain:0.2,vig:0.4} },
+  { id:'vhs',         name:'VHS',          cat:'special',
+    css:'brightness(1.0) contrast(1.2) saturate(1.3) hue-rotate(-5deg)',
+    p:{br:1.0,ct:1.2,sat:1.3,tmp:-3,r:-3,g:3,b:5,grain:0.25,vig:0.35,vhs:true} },
+  { id:'night-flash', name:'Night Flash',  cat:'special',
+    css:'brightness(0.75) contrast(1.45) saturate(0.8)',
+    p:{br:0.75,ct:1.45,sat:0.8,tmp:0,r:0,g:0,b:0,grain:0.3,vig:0.62} },
+];
+
+/* ==========================================================
+   SECTION 2: APP STATE
+========================================================== */
+const S = {
+  camera: { stream:null, facing:'environment', active:false },
+  settings: {
+    activeFilter:'kodak-gold',
+    grainLevel:'low',
+    dateStamp:'off',
+    dateFmt:'mdy',
+    flashMode:'auto',
+    timerDur:0,
+    soundOn:true,
+    vibOn:true,
+    mirrorSelfie:true,
+    randomFilm:false,
+    aspectRatio:'4:3',
+    rollSize:27,
+  },
+  film: { rollId:1, size:27, remaining:27, totalTaken:0 },
+  gallery: { photos:[], nextId:1, viewingId:null },
+  timer: { active:false, handle:null, cancelRequested:false },
+  grain: { animId:null, lastT:0, fps:10 },
+  db: null,
+};
+
+/* ==========================================================
+   SECTION 3: HELPERS
+========================================================== */
+const clamp = (v,lo=0,hi=255) => Math.max(lo, Math.min(hi, v));
+const lerp  = (a,b,t) => a + (b-a)*t;
+const $ = id => document.getElementById(id);
+const $$ = sel => document.querySelectorAll(sel);
+
+function fmtNum(n, pad=2){ return String(n).padStart(pad,'0'); }
+
+function getGrainIntensity(){
+  const lvl = S.settings.grainLevel;
+  return {none:0, low:22, medium:44, high:72}[lvl] ?? 22;
+}
+
+/* ==========================================================
+   SECTION 4: STORAGE (localStorage + IndexedDB)
+========================================================== */
+const Storage = {
+  SK:'disposable_v1',
+
+  loadSettings(){
+    try{
+      const raw = localStorage.getItem(this.SK);
+      if(!raw) return;
+      const saved = JSON.parse(raw);
+      Object.assign(S.settings, saved.settings || {});
+      Object.assign(S.film, saved.film || {});
+      S.gallery.nextId = saved.nextId || 1;
+    }catch(e){}
+  },
+
+  save(){
+    try{
+      localStorage.setItem(this.SK, JSON.stringify({
+        settings: S.settings,
+        film:     S.film,
+        nextId:   S.gallery.nextId,
+      }));
+    }catch(e){}
+  },
+
+  async openDB(){
+    if(S.db) return S.db;
+    return new Promise((res,rej)=>{
+      const req = indexedDB.open('DisposableCam',2);
+      req.onupgradeneeded = e => {
+        const db = e.target.result;
+        if(!db.objectStoreNames.contains('photos')){
+          const st = db.createObjectStore('photos',{keyPath:'id'});
+          st.createIndex('roll','rollId',{unique:false});
+        }
+      };
+      req.onsuccess = e => { S.db = e.target.result; res(S.db); };
+      req.onerror   = () => rej(req.error);
+    });
+  },
+
+  async savePhoto(photo){
+    try{
+      const db = await this.openDB();
+      return new Promise((res,rej)=>{
+        const tx  = db.transaction('photos','readwrite');
+        const req = tx.objectStore('photos').add(photo);
+        req.onsuccess = () => res(req.result);
+        req.onerror   = () => rej(req.error);
+      });
+    }catch(e){ console.warn('DB save failed:',e); }
+  },
+
+  async loadPhotos(){
+    try{
+      const db = await this.openDB();
+      return new Promise((res,rej)=>{
+        const req = db.transaction('photos','readonly')
+                      .objectStore('photos').getAll();
+        req.onsuccess = () => res(req.result || []);
+        req.onerror   = () => res([]);
+      });
+    }catch(e){ return []; }
+  },
+
+  async deletePhoto(id){
+    try{
+      const db = await this.openDB();
+      return new Promise((res,rej)=>{
+        const req = db.transaction('photos','readwrite')
+                      .objectStore('photos').delete(id);
+        req.onsuccess = () => res();
+        req.onerror   = () => rej(req.error);
+      });
+    }catch(e){}
+  },
+};
+
+/* ==========================================================
+   SECTION 5: SOUND
+========================================================== */
+const Sound = {
+  ctx: null,
+
+  init(){
+    // AudioContext created on first user gesture
+  },
+
+  ensureCtx(){
+    if(!this.ctx){
+      try{ this.ctx = new (window.AudioContext || window.webkitAudioContext)(); }
+      catch(e){}
+    }
+    if(this.ctx && this.ctx.state === 'suspended') this.ctx.resume();
+  },
+
+  playShutter(){
+    if(!S.settings.soundOn) return;
+    this.ensureCtx();
+    if(!this.ctx) return;
+
+    const ac  = this.ctx;
+    const now = ac.currentTime;
+
+    // Sharp mechanical click — noise burst + pitch envelope
+    const bufSz = Math.floor(ac.sampleRate * 0.18);
+    const buf   = ac.createBuffer(1, bufSz, ac.sampleRate);
+    const data  = buf.getChannelData(0);
+
+    // Attack transient
+    data[0] = 0.6; data[1] = -0.4; data[2] = 0.3;
+    for(let i=3; i<bufSz; i++){
+      data[i] = (Math.random()*2-1) * Math.exp(-i / (ac.sampleRate*0.025));
+    }
+
+    const src = ac.createBufferSource();
+    src.buffer = buf;
+
+    const hp = ac.createBiquadFilter();
+    hp.type = 'highpass'; hp.frequency.value = 600;
+
+    const gain = ac.createGain();
+    gain.gain.setValueAtTime(0.45, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.18);
+
+    src.connect(hp); hp.connect(gain); gain.connect(ac.destination);
+    src.start(now);
+  },
+};
+
+/* ==========================================================
+   SECTION 6: CAMERA
+========================================================== */
+const Camera = {
+
+  getConstraints(){
+    const ar = S.settings.aspectRatio;
+    const ratioMap = {'4:3':4/3,'16:9':16/9,'1:1':1};
+    const aspectRatio = ratioMap[ar] || 4/3;
+    return {
+      video:{
+        facingMode:{ ideal: S.camera.facing },
+        aspectRatio:{ ideal: aspectRatio },
+        width:{ ideal: 1920 },
+        height:{ ideal: 1440 },
+      },
+      audio:false
+    };
+  },
+
+  async start(){
+    // Try with ideal constraints first, fallback to basic video
+    try{
+      S.camera.stream = await navigator.mediaDevices.getUserMedia(this.getConstraints());
+    }catch(err){
+      if(err.name === 'OverconstrainedError' || err.name === 'NotFoundError'){
+        try{
+          S.camera.stream = await navigator.mediaDevices.getUserMedia({video:true,audio:false});
+        }catch(e2){
+          this.handleError(e2); return false;
+        }
+      } else if(err.name === 'NotAllowedError'){
+        this.handleError(err); return false;
+      } else {
+        // Try simple fallback for other errors
+        try{
+          S.camera.stream = await navigator.mediaDevices.getUserMedia({video:true,audio:false});
+        }catch(e3){
+          this.handleError(e3); return false;
+        }
+      }
+    }
+    const vid = $('video');
+    vid.srcObject = S.camera.stream;
+    await new Promise(r => vid.addEventListener('loadedmetadata', r, {once:true}));
+    vid.play().catch(()=>{});
+    S.camera.active = true;
+
+    $('rec-dot').classList.add('active');
+    this.applyMirror();
+    FilterEngine.applyCSS(S.settings.activeFilter);
+    Grain.start();
+    UI.updateHUD();
+    return true;
+  },
+
+  async switch(){
+    this.stop();
+    S.camera.facing = (S.camera.facing === 'environment') ? 'user' : 'environment';
+    Storage.save();
+
+    // Flip animation
+    const vf = $('viewfinder');
+    vf.style.transition = 'transform 0.2s ease';
+    vf.style.transform  = 'scaleX(0)';
+    await new Promise(r => setTimeout(r, 200));
+    vf.style.transform = 'scaleX(1)';
+    setTimeout(()=>{ vf.style.transition=''; vf.style.transform=''; }, 400);
+
+    await this.start();
+  },
+
+  stop(){
+    if(S.camera.stream){
+      S.camera.stream.getTracks().forEach(t => t.stop());
+      S.camera.stream = null;
+    }
+    S.camera.active = false;
+    Grain.stop();
+    $('rec-dot').classList.remove('active');
+  },
+
+  applyMirror(){
+    const vid = $('video');
+    const shouldMirror = S.camera.facing==='user' && S.settings.mirrorSelfie;
+    vid.classList.toggle('mirrored', shouldMirror);
+  },
+
+  handleError(err){
+    $('welcome').classList.remove('hidden');
+    $('app').classList.add('hidden');
+    if(err.name === 'NotAllowedError'){
+      $('permission-denied').classList.remove('hidden');
+      $('btn-allow').textContent = 'TRY AGAIN';
+    }else{
+      UI.toast(`Camera unavailable: ${err.message || err.name}`, 'error', 4000);
+    }
+  },
+
+  isMirrored(){
+    return S.camera.facing==='user' && S.settings.mirrorSelfie;
+  },
+};
+
+/* ==========================================================
+   SECTION 7: FILTER ENGINE
+========================================================== */
+const FilterEngine = {
+
+  getFilter(id){ return FILTERS.find(f=>f.id===id) || FILTERS[0]; },
+
+  applyCSS(id){
+    const f   = this.getFilter(id);
+    $('video').style.filter = f.css || 'none';
+
+    // VHS overlay
+    const vhsEl = $('vhs-overlay');
+    vhsEl.classList.toggle('hidden', id !== 'vhs');
+
+    // Update strip
+    $$('.filter-item').forEach(el => {
+      el.classList.toggle('active', el.dataset.fid === id);
+      el.setAttribute('aria-selected', el.dataset.fid === id ? 'true' : 'false');
+    });
+
+    // Scroll active into view
+    const active = document.querySelector('.filter-item.active');
+    if(active) active.scrollIntoView({behavior:'smooth',inline:'center',block:'nearest'});
+
+    S.settings.activeFilter = id;
+    UI.updateHUD();
+    Storage.save();
+  },
+
+  buildStrip(){
+    const strip = $('filter-strip');
+    strip.innerHTML = '';
+    FILTERS.forEach(f => {
+      const btn = document.createElement('button');
+      btn.className = 'filter-item' + (f.id===S.settings.activeFilter?' active':'');
+      btn.dataset.fid = f.id;
+      btn.setAttribute('role','option');
+      btn.setAttribute('aria-selected', f.id===S.settings.activeFilter ? 'true':'false');
+      btn.setAttribute('aria-label', `${f.name} filter`);
+
+      const thumb = document.createElement('div');
+      thumb.className = 'filter-thumb';
+      const inner = document.createElement('div');
+      inner.className = 'filter-thumb-inner';
+      inner.style.filter = f.css || 'none';
+      thumb.appendChild(inner);
+
+      const lbl = document.createElement('span');
+      lbl.className = 'filter-label';
+      lbl.textContent = f.name;
+
+      btn.appendChild(thumb);
+      btn.appendChild(lbl);
+      btn.addEventListener('click', () => FilterEngine.applyCSS(f.id));
+
+      strip.appendChild(btn);
+    });
+  },
+};
+
+/* ==========================================================
+   SECTION 8: GRAIN CANVAS OVERLAY
+========================================================== */
+const Grain = {
+  ctx: null,
+  animId: null,
+  lastT: 0,
+
+  start(){
+    this.resize();
+    window.addEventListener('resize', ()=>this.resize());
+    this.animId = requestAnimationFrame(t => this.loop(t));
+  },
+
+  stop(){
+    cancelAnimationFrame(this.animId);
+    this.animId = null;
+  },
+
+  resize(){
+    const canvas = $('grain-canvas');
+    const vf     = $('viewfinder');
+    canvas.width  = vf.offsetWidth;
+    canvas.height = vf.offsetHeight;
+    this.ctx = canvas.getContext('2d');
+  },
+
+  loop(t){
+    this.animId = requestAnimationFrame(ts => this.loop(ts));
+    const fps = S.grain ? S.grain.fps : 10;
+    if(t - this.lastT < 1000/fps) return;
+    this.lastT = t;
+
+    const intensity = getGrainIntensity();
+    const canvas = $('grain-canvas');
+    const ctx    = this.ctx;
+    if(!ctx) return;
+    const { width:w, height:h } = canvas;
+    if(!w || !h) return;
+
+    if(intensity === 0){
+      ctx.clearRect(0,0,w,h);
+      return;
+    }
+
+    const imageData = ctx.createImageData(w, h);
+    const d = imageData.data;
+    for(let i=0; i<d.length; i+=4){
+      const n = (Math.random()*2-1) * intensity;
+      d[i]   = 128 + n;
+      d[i+1] = 128 + n;
+      d[i+2] = 128 + n;
+      d[i+3] = Math.random() * 28 + 4;
+    }
+    ctx.putImageData(imageData, 0, 0);
+  },
+};
+
+/* ==========================================================
+   SECTION 9: FILM PROCESSOR (canvas capture & processing)
+========================================================== */
+const FilmProcessor = {
+
+  async capture(){
+    if(!S.camera.active) return;
+    if(S.film.remaining <= 0){ FilmRoll.showFinished(); return; }
+
+    const vid  = $('video');
+    const proc = $('proc-canvas');
+    const fw   = vid.videoWidth  || 1280;
+    const fh   = vid.videoHeight || 960;
+
+    // Cap resolution
+    const MAX = 1920;
+    const scale = Math.min(1, MAX / Math.max(fw, fh));
+    const cw = Math.round(fw * scale);
+    const ch = Math.round(fh * scale);
+
+    proc.width  = cw;
+    proc.height = ch;
+    const ctx = proc.getContext('2d');
+
+    // Draw video (handle mirror)
+    ctx.save();
+    if(Camera.isMirrored()){
+      ctx.translate(cw,0);
+      ctx.scale(-1,1);
+    }
+    ctx.drawImage(vid, 0, 0, cw, ch);
+    ctx.restore();
+
+    // Flash brightness boost on canvas
+    const flashActive = this.shouldFlash(ctx, cw, ch);
+    if(flashActive){
+      ctx.fillStyle = 'rgba(255,255,255,0.18)';
+      ctx.fillRect(0,0,cw,ch);
+    }
+
+    // Get filter params
+    const filter = FilterEngine.getFilter(S.settings.activeFilter);
+    let p = Object.assign({}, filter.p);
+
+    // Random film variation
+    if(S.settings.randomFilm){
+      p.br  += (Math.random()-0.5)*0.18;
+      p.ct  += (Math.random()-0.5)*0.15;
+      p.sat += (Math.random()-0.5)*0.18;
+      p.tmp += (Math.random()-0.5)*14;
+      p.grain += Math.random()*0.07;
+    }
+
+    // Grain intensity override
+    const grainLvlBoost = {none:0,low:0.08,medium:0.16,high:0.3}[S.settings.grainLevel] || 0.08;
+    p.grain = Math.max(p.grain, grainLvlBoost);
+
+    // Apply color processing
+    this.processPixels(ctx, cw, ch, p);
+
+    // Vignette
+    this.drawVignette(ctx, cw, ch, p.vig || 0.3);
+
+    // Film grain on capture
+    this.drawGrain(ctx, cw, ch, p.grain);
+
+    // VHS scanlines
+    if(p.vhs) this.drawVHSScanlines(ctx, cw, ch);
+
+    // Date stamp
+    this.drawDateStamp(ctx, cw, ch);
+
+    // Export
+    const dataURL = proc.toDataURL('image/jpeg', 0.92);
+
+    // Thumbnail
+    const thumb = await this.makeThumbnail(dataURL, 300);
+
+    return { dataURL, thumb };
+  },
+
+  shouldFlash(ctx, w, h){
+    const fm = S.settings.flashMode;
+    if(fm === 'off') return false;
+    if(fm === 'on')  return true;
+    // AUTO: sample brightness
+    const sample = ctx.getImageData(w/4|0, h/4|0, w/2|0, h/2|0);
+    let avg = 0;
+    for(let i=0; i<sample.data.length; i+=4){
+      avg += (sample.data[i]*0.299 + sample.data[i+1]*0.587 + sample.data[i+2]*0.114);
+    }
+    avg /= (sample.data.length/4);
+    return avg < 90;
+  },
+
+  processPixels(ctx, w, h, p){
+    const imageData = ctx.getImageData(0,0,w,h);
+    const d = imageData.data;
+
+    const { br=1, ct=1, sat=1, tmp=0, r:ro=0, g:go=0, b:bo=0,
+            fade=0, bw=false, sepia=false } = p;
+
+    for(let i=0; i<d.length; i+=4){
+      let r = d[i], g = d[i+1], b = d[i+2];
+
+      // Temperature shift
+      r += tmp; b -= tmp;
+
+      // Channel offsets
+      r += ro; g += go; b += bo;
+
+      // Brightness
+      r *= br; g *= br; b *= br;
+
+      // Contrast (about 128)
+      r = (r-128)*ct + 128;
+      g = (g-128)*ct + 128;
+      b = (b-128)*ct + 128;
+
+      // Saturation
+      if(sat !== 1 && !bw && !sepia){
+        const lum = 0.299*r + 0.587*g + 0.114*b;
+        r = lum + (r-lum)*sat;
+        g = lum + (g-lum)*sat;
+        b = lum + (b-lum)*sat;
+      }
+
+      // Special modes
+      if(bw){
+        const gr = 0.299*r + 0.587*g + 0.114*b;
+        r = g = b = gr;
+      } else if(sepia){
+        const lum = 0.299*r + 0.587*g + 0.114*b;
+        r = clamp(lum*1.08 + 22);
+        g = clamp(lum*0.95 + 8);
+        b = clamp(lum*0.85 - 10);
+      }
+
+      // Fade (lifted blacks)
+      if(fade > 0){
+        r = lerp(r, 255*0.45, fade);
+        g = lerp(g, 255*0.45, fade);
+        b = lerp(b, 255*0.45, fade);
+      }
+
+      d[i]   = clamp(r);
+      d[i+1] = clamp(g);
+      d[i+2] = clamp(b);
+    }
+
+    ctx.putImageData(imageData, 0, 0);
+  },
+
+  drawGrain(ctx, w, h, intensity){
+    if(intensity <= 0) return;
+    const id  = ctx.createImageData(w, h);
+    const d   = id.data;
+    const amp = intensity * 120;
+    for(let i=0; i<d.length; i+=4){
+      const n = (Math.random()*2-1) * amp;
+      d[i]   = clamp(128 + n);
+      d[i+1] = clamp(128 + n);
+      d[i+2] = clamp(128 + n);
+      d[i+3] = Math.random() * 40 + 8;
+    }
+    ctx.globalCompositeOperation = 'overlay';
+    ctx.putImageData(id, 0, 0);
+    ctx.globalCompositeOperation = 'source-over';
+  },
+
+  drawVignette(ctx, w, h, intensity){
+    const cx = w/2, cy = h/2;
+    const r0 = Math.min(w,h) * 0.35;
+    const r1 = Math.max(w,h) * 0.75;
+    const grad = ctx.createRadialGradient(cx,cy,r0,cx,cy,r1);
+    grad.addColorStop(0, 'rgba(0,0,0,0)');
+    grad.addColorStop(1, `rgba(0,0,0,${Math.min(intensity, 0.85)})`);
+    ctx.fillStyle = grad;
+    ctx.fillRect(0,0,w,h);
+  },
+
+  drawVHSScanlines(ctx, w, h){
+    ctx.fillStyle = 'rgba(0,0,0,0.09)';
+    for(let y=0; y<h; y+=4) ctx.fillRect(0,y,w,1);
+    // Chromatic fringe: red shifted slightly right
+    const img = ctx.getImageData(0,0,w,h);
+    const d   = img.data;
+    const sh  = 2;
+    for(let y=0; y<h; y++){
+      for(let x=sh; x<w; x++){
+        const to   = (y*w+x)*4;
+        const from = (y*w+(x-sh))*4;
+        d[to] = d[from]; // shift red channel
+      }
+    }
+    ctx.putImageData(img,0,0);
+  },
+
+  drawDateStamp(ctx, w, h){
+    const mode = S.settings.dateStamp;
+    if(mode === 'off') return;
+
+    const now  = new Date();
+    const mm   = fmtNum(now.getMonth()+1);
+    const dd   = fmtNum(now.getDate());
+    const yyyy = now.getFullYear();
+    const yy   = String(yyyy).slice(-2);
+    const HH   = fmtNum(now.getHours());
+    const MM   = fmtNum(now.getMinutes());
+
+    let text = '';
+    const fmt = S.settings.dateFmt;
+    if(mode === 'date'){
+      if(fmt==='mdy') text = `${mm} ${dd} ${yyyy}`;
+      else if(fmt==='dmy') text = `${dd} ${mm} ${yyyy}`;
+      else               text = `${yyyy} ${mm} ${dd}`;
+    } else {
+      if(fmt==='mdy') text = `${mm}/${dd}/${yy} ${HH}:${MM}`;
+      else if(fmt==='dmy') text = `${dd}/${mm}/${yy} ${HH}:${MM}`;
+      else               text = `${yyyy}/${mm}/${dd} ${HH}:${MM}`;
+    }
+
+    const fs  = Math.max(16, Math.round(w * 0.022));
+    ctx.font  = `bold ${fs}px 'Space Mono', 'Courier New', monospace`;
+    ctx.textAlign    = 'right';
+    ctx.textBaseline = 'bottom';
+
+    // Glow / halo
+    ctx.shadowColor  = 'rgba(220,100,0,0.9)';
+    ctx.shadowBlur   = fs * 0.8;
+    ctx.fillStyle    = '#E87A00';
+    const px = Math.round(w * 0.025);
+    const py = Math.round(h * 0.025);
+    ctx.fillText(text, w-px, h-py);
+    ctx.shadowBlur = 0;
+  },
+
+  async makeThumbnail(dataURL, maxSide){
+    return new Promise(res => {
+      const img = new Image();
+      img.onload = () => {
+        const ratio = Math.min(maxSide/img.width, maxSide/img.height);
+        const tw = Math.round(img.width*ratio);
+        const th = Math.round(img.height*ratio);
+        const c  = document.createElement('canvas');
+        c.width  = tw; c.height = th;
+        c.getContext('2d').drawImage(img,0,0,tw,th);
+        res(c.toDataURL('image/jpeg',0.75));
+      };
+      img.onerror = () => res(dataURL);
+      img.src = dataURL;
+    });
+  },
+};
+
+/* ==========================================================
+   SECTION 10: FILM ROLL
+========================================================== */
+const FilmRoll = {
+
+  decrement(){
+    if(S.film.remaining > 0) S.film.remaining--;
+    S.film.totalTaken++;
+    UI.updateCounter();
+    Storage.save();
+    if(S.film.remaining <= 0) this.showFinished();
+  },
+
+  newRoll(size){
+    if(size) S.settings.rollSize = size;
+    S.film.size      = S.settings.rollSize;
+    S.film.remaining = S.film.size;
+    S.film.rollId    = Date.now();
+    UI.updateCounter();
+    UI.closeRollModal();
+    Storage.save();
+    UI.toast(`New roll loaded — ${S.film.size} shots`, 'success');
+  },
+
+  showFinished(){
+    $('roll-count-text').textContent =
+      `${S.film.size - S.film.remaining} shot${S.film.size!==1?'s':''} taken`;
+    $('roll-modal').classList.add('open');
+  },
+
+  updateFromSettings(size){
+    const n = parseInt(size);
+    if(!isNaN(n)){
+      S.settings.rollSize = n;
+      // Only adjust if current roll is not yet started or same size
+      if(S.film.remaining === S.film.size){
+        S.film.size      = n;
+        S.film.remaining = n;
+        UI.updateCounter();
+      }
+      Storage.save();
+    }
+  },
+};
+
+/* ==========================================================
+   SECTION 11: SELF TIMER
+========================================================== */
+const SelfTimer = {
+
+  async run(cb){
+    const dur = S.settings.timerDur;
+    if(dur === 0){ cb(); return; }
+
+    S.timer.active = true;
+    S.timer.cancelRequested = false;
+    $('countdown-overlay').classList.remove('hidden');
+
+    for(let i=dur; i>0; i--){
+      if(S.timer.cancelRequested) break;
+      const el = $('countdown-num');
+      el.textContent = String(i);
+      el.style.animation = 'none';
+      void el.offsetWidth;
+      el.style.animation = '';
+      // Haptic each second
+      if(S.settings.vibOn && navigator.vibrate) navigator.vibrate(20);
+      await this.wait(1000);
+      if(S.timer.cancelRequested) break;
+    }
+
+    $('countdown-overlay').classList.add('hidden');
+    S.timer.active = false;
+
+    if(!S.timer.cancelRequested) cb();
+  },
+
+  cancel(){
+    S.timer.cancelRequested = true;
+    S.timer.active = false;
+    $('countdown-overlay').classList.add('hidden');
+  },
+
+  wait(ms){ return new Promise(r => setTimeout(r, ms)); },
+};
+
+/* ==========================================================
+   SECTION 12: GALLERY
+========================================================== */
+const Gallery = {
+
+  async add(photo){
+    S.gallery.photos.push(photo);
+    // Persist to IndexedDB
+    try{ await Storage.savePhoto(photo); }catch(e){}
+  },
+
+  async delete(id){
+    const idx = S.gallery.photos.findIndex(p=>p.id===id);
+    if(idx !== -1) S.gallery.photos.splice(idx,1);
+    try{ await Storage.deletePhoto(id); }catch(e){}
+    this.renderGrid();
+  },
+
+  open(){
+    this.renderGrid();
+    $('gallery-modal').classList.add('open');
+  },
+
+  close(){
+    $('gallery-modal').classList.remove('open');
+  },
+
+  openViewer(id){
+    const photo = S.gallery.photos.find(p=>p.id===id);
+    if(!photo) return;
+    S.gallery.viewingId = id;
+    const num = String(photo.num).padStart(3,'0');
+    $('viewer-title').textContent = `DISPOSABLE_${num}`;
+    $('viewer-img').src = photo.dataURL;
+    $('photo-viewer').classList.add('open');
+  },
+
+  closeViewer(){
+    $('photo-viewer').classList.remove('open');
+    S.gallery.viewingId = null;
+  },
+
+  renderGrid(){
+    const grid  = $('gallery-grid');
+    const empty = $('gallery-empty');
+    grid.innerHTML = '';
+
+    if(S.gallery.photos.length === 0){
+      empty.classList.remove('hidden');
+      return;
+    }
+    empty.classList.add('hidden');
+
+    // Newest first
+    const sorted = [...S.gallery.photos].reverse();
+    sorted.forEach(photo => {
+      const div = document.createElement('div');
+      div.className = 'gallery-thumb';
+      div.setAttribute('role','button');
+      div.setAttribute('tabindex','0');
+      div.setAttribute('aria-label', `Photo ${photo.num}`);
+
+      const img = document.createElement('img');
+      img.src   = photo.thumb || photo.dataURL;
+      img.alt   = `Photo ${photo.num}`;
+      img.loading = 'lazy';
+
+      const num = document.createElement('div');
+      num.className = 'gallery-thumb-num';
+      num.textContent = String(photo.num).padStart(3,'0');
+
+      div.appendChild(img);
+      div.appendChild(num);
+      div.addEventListener('click',  () => this.openViewer(photo.id));
+      div.addEventListener('keydown', e => { if(e.key==='Enter') this.openViewer(photo.id); });
+      grid.appendChild(div);
+    });
+  },
+
+  download(id){
+    const photo = S.gallery.photos.find(p=>p.id===id);
+    if(!photo) return;
+    const a   = document.createElement('a');
+    a.href    = photo.dataURL;
+    a.download = `DISPOSABLE_${String(photo.num).padStart(3,'0')}.jpg`;
+    a.click();
+  },
+
+  async share(id){
+    const photo = S.gallery.photos.find(p=>p.id===id);
+    if(!photo) return;
+
+    if(!navigator.share){
+      this.download(id);
+      UI.toast('Saved to device instead', 'info');
+      return;
+    }
+    try{
+      const res  = await fetch(photo.dataURL);
+      const blob = await res.blob();
+      const file = new File([blob], `DISPOSABLE_${String(photo.num).padStart(3,'0')}.jpg`, {type:'image/jpeg'});
+      await navigator.share({
+        title: 'Disposable Camera',
+        text:  'Shot with Disposable 📸',
+        files: navigator.canShare && navigator.canShare({files:[file]}) ? [file] : undefined,
+      });
+    }catch(e){
+      if(e.name !== 'AbortError') UI.toast('Unable to share', 'error');
+    }
+  },
+};
+
+/* ==========================================================
+   SECTION 13: UI HELPERS
+========================================================== */
+const UI = {
+
+  toast(msg, type='info', dur=2200){
+    const c    = $('toast-container');
+    const el   = document.createElement('div');
+    el.className = `toast toast-${type}`;
+    el.textContent = msg;
+    c.appendChild(el);
+    requestAnimationFrame(() => el.classList.add('show'));
+    setTimeout(() => {
+      el.classList.remove('show');
+      setTimeout(() => { try{ c.removeChild(el); }catch(e){} }, 300);
+    }, dur);
+  },
+
+  flashScreen(withBoost){
+    const ov = $('flash-overlay');
+    ov.style.opacity = withBoost ? '0.92' : '0.6';
+    setTimeout(() => { ov.style.transition='opacity 0.4s'; ov.style.opacity='0'; }, 80);
+    setTimeout(() => { ov.style.transition=''; }, 500);
+  },
+
+  showFocus(x, y){
+    const ring = $('focus-ring');
+    ring.style.left = x + 'px';
+    ring.style.top  = y + 'px';
+    ring.classList.remove('show');
+    void ring.offsetWidth;
+    ring.classList.add('show');
+    clearTimeout(ring._t);
+    ring._t = setTimeout(() => ring.classList.remove('show'), 1200);
+  },
+
+  updateHUD(){
+    // Filter name
+    const f = FilterEngine.getFilter(S.settings.activeFilter);
+    $('hud-filter-name').textContent = (f.name || 'Original').toUpperCase();
+
+    // Flash
+    const fh = $('hud-flash');
+    const fm = S.settings.flashMode.toUpperCase();
+    fh.textContent = fm;
+    fh.className   = 'hud-flash' + (S.settings.flashMode==='on'?' flash-on':'');
+
+    // Counter
+    this.updateCounter();
+  },
+
+  updateCounter(){
+    const el = $('hud-counter');
+    el.innerHTML = `${S.film.remaining}<span class="sep">/</span>${S.film.size}`;
+  },
+
+  showPhotoSaved(thumbURL){
+    const wrap = $('photo-saved-thumb');
+    const img  = $('photo-saved-img');
+    img.src = thumbURL;
+    wrap.classList.add('show');
+    clearTimeout(wrap._t);
+    wrap._t = setTimeout(() => wrap.classList.remove('show'), 1400);
+  },
+
+  closeRollModal(){
+    $('roll-modal').classList.remove('open');
+  },
+
+  // Settings panel helpers
+  syncSettingsUI(){
+    // Toggles
+    $('tog-mirror').checked   = S.settings.mirrorSelfie;
+    $('tog-random').checked   = S.settings.randomFilm;
+    $('tog-sound').checked    = S.settings.soundOn;
+    $('tog-vibration').checked = S.settings.vibOn;
+
+    // Segmented controls
+    this.syncSeg('seg-aspect',    S.settings.aspectRatio);
+    this.syncSeg('seg-roll',      String(S.settings.rollSize));
+    this.syncSeg('seg-grain',     S.settings.grainLevel);
+    this.syncSeg('seg-flash',     S.settings.flashMode);
+    this.syncSeg('seg-datestamp', S.settings.dateStamp);
+    this.syncSeg('seg-datefmt',   S.settings.dateFmt);
+    this.syncSeg('seg-timer',     String(S.settings.timerDur));
+    this.updateTimerLabel();
+  },
+
+  syncSeg(segId, val){
+    const seg = $(segId);
+    if(!seg) return;
+    seg.querySelectorAll('.seg-btn').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.val === val);
+    });
+  },
+
+  updateTimerLabel(){
+    const dur = S.settings.timerDur;
+    const lbl = $('timer-label');
+    const badge = $('timer-badge');
+    if(dur === 0){
+      lbl.textContent = 'TIMER';
+      badge.classList.add('hidden');
+      $('btn-timer').classList.remove('active-state');
+    }else{
+      lbl.textContent = `${dur}S`;
+      badge.textContent = dur;
+      badge.classList.remove('hidden');
+      $('btn-timer').classList.add('active-state');
+    }
+  },
+};
+
+/* ==========================================================
+   SECTION 14: SHUTTER ACTION (the main capture flow)
+========================================================== */
+async function doShutter(){
+  if(S.timer.active) return;
+  if(!S.camera.active) return;
+  if(S.film.remaining <= 0){ FilmRoll.showFinished(); return; }
+
+  $('btn-shutter').classList.add('capturing');
+  $('btn-shutter').disabled = true;
+
+  await SelfTimer.run(async () => {
+    // Haptic
+    if(S.settings.vibOn && navigator.vibrate) navigator.vibrate([50]);
+
+    // Sound
+    Sound.playShutter();
+
+    // Visual flash
+    const needsFlash = S.settings.flashMode !== 'off';
+    UI.flashScreen(needsFlash);
+
+    // Process photo
+    let photo;
+    try{
+      const result = await FilmProcessor.capture();
+      if(!result) throw new Error('No result');
+
+      const id  = S.gallery.nextId++;
+      const num = S.film.totalTaken + 1;
+      photo = {
+        id,
+        num,
+        rollId:   S.film.rollId,
+        filter:   S.settings.activeFilter,
+        dataURL:  result.dataURL,
+        thumb:    result.thumb,
+        ts:       Date.now(),
+      };
+
+      await Gallery.add(photo);
+      FilmRoll.decrement();
+      UI.showPhotoSaved(result.thumb);
+      Storage.save();
+
+    }catch(err){
+      console.warn('Capture error:', err);
+      UI.toast('Unable to save photo. Try again.', 'error');
+    }
+  });
+
+  $('btn-shutter').classList.remove('capturing');
+  $('btn-shutter').disabled = false;
+}
+
+/* ==========================================================
+   SECTION 15: SETTINGS BINDING
+========================================================== */
+function bindSettings(){
+  // Seg controls
+  function onSeg(segId, setter){
+    const seg = $(segId);
+    if(!seg) return;
+    seg.querySelectorAll('.seg-btn').forEach(btn => {
+      btn.addEventListener('click', ()=>{
+        seg.querySelectorAll('.seg-btn').forEach(b=>b.classList.remove('active'));
+        btn.classList.add('active');
+        setter(btn.dataset.val);
+        Storage.save();
+      });
+    });
+  }
+
+  onSeg('seg-aspect', v => {
+    S.settings.aspectRatio = v;
+    // Restart camera to apply new aspect ratio
+    Camera.stop();
+    Camera.start();
+  });
+  onSeg('seg-roll', v => FilmRoll.updateFromSettings(v));
+  onSeg('seg-grain', v => { S.settings.grainLevel = v; });
+  onSeg('seg-flash', v => { S.settings.flashMode = v; UI.updateHUD(); });
+  onSeg('seg-datestamp', v => { S.settings.dateStamp = v; });
+  onSeg('seg-datefmt', v => { S.settings.dateFmt = v; });
+  onSeg('seg-timer', v => {
+    S.settings.timerDur = parseInt(v)||0;
+    UI.updateTimerLabel();
+  });
+
+  // Toggles
+  $('tog-mirror').addEventListener('change', e => {
+    S.settings.mirrorSelfie = e.target.checked;
+    Camera.applyMirror();
+    Storage.save();
+  });
+  $('tog-random').addEventListener('change', e => {
+    S.settings.randomFilm = e.target.checked;
+    Storage.save();
+  });
+  $('tog-sound').addEventListener('change', e => {
+    S.settings.soundOn = e.target.checked;
+    Storage.save();
+  });
+  $('tog-vibration').addEventListener('change', e => {
+    S.settings.vibOn = e.target.checked;
+    Storage.save();
+  });
+
+  // New roll from settings
+  $('btn-new-roll-settings').addEventListener('click', ()=>{
+    FilmRoll.newRoll();
+    $('settings-panel').classList.remove('open');
+  });
+}
+
+/* ==========================================================
+   SECTION 16: EVENT LISTENERS
+========================================================== */
+function bindEvents(){
+
+  // Welcome screen
+  $('btn-allow').addEventListener('click', initCamera);
+
+  // Shutter
+  $('btn-shutter').addEventListener('click', doShutter);
+
+  // Timer toggle (cycle)
+  $('btn-timer').addEventListener('click', ()=>{
+    const cycles = [0,3,5,10];
+    const idx    = cycles.indexOf(S.settings.timerDur);
+    S.settings.timerDur = cycles[(idx+1) % cycles.length];
+    UI.syncSeg('seg-timer', String(S.settings.timerDur));
+    UI.updateTimerLabel();
+    Storage.save();
+    if(S.settings.timerDur > 0)
+      UI.toast(`Timer: ${S.settings.timerDur}s`, 'info', 1000);
+    else
+      UI.toast('Timer off', 'info', 800);
+  });
+
+  // Camera flip
+  $('btn-flip').addEventListener('click', ()=> Camera.switch());
+
+  // Gallery
+  $('btn-gallery').addEventListener('click', ()=> Gallery.open());
+  $('btn-gallery-close').addEventListener('click', ()=> Gallery.close());
+
+  // Photo viewer
+  $('btn-viewer-back').addEventListener('click', ()=> Gallery.closeViewer());
+  $('btn-viewer-download').addEventListener('click', ()=> Gallery.download(S.gallery.viewingId));
+  $('btn-viewer-share').addEventListener('click', ()=> Gallery.share(S.gallery.viewingId));
+  $('btn-viewer-delete').addEventListener('click', async ()=>{
+    if(!confirm('Delete this photo?')) return;
+    await Gallery.delete(S.gallery.viewingId);
+    Gallery.closeViewer();
+    UI.toast('Photo deleted');
+  });
+
+  // Settings panel
+  $('btn-settings').addEventListener('click', ()=>{
+    UI.syncSettingsUI();
+    $('settings-panel').classList.add('open');
+  });
+  $('btn-settings-close').addEventListener('click', ()=>{
+    $('settings-panel').classList.remove('open');
+  });
+
+  // Film roll modal
+  $('btn-new-roll').addEventListener('click', ()=> FilmRoll.newRoll());
+  $('btn-view-gallery-roll').addEventListener('click', ()=>{
+    UI.closeRollModal();
+    Gallery.open();
+  });
+
+  // Countdown cancel
+  $('btn-cancel-timer').addEventListener('click', ()=> SelfTimer.cancel());
+
+  // Viewfinder tap = focus ring
+  $('viewfinder-hit').addEventListener('click', e => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    UI.showFocus(e.clientX - rect.left, e.clientY - rect.top);
+  });
+  $('viewfinder-hit').addEventListener('keydown', e => {
+    if(e.key==='Enter'||e.key===' ') doShutter();
+  });
+
+  // Keyboard shortcuts (desktop)
+  document.addEventListener('keydown', e => {
+    if(e.target.tagName === 'INPUT') return;
+    if(e.code === 'Space' || e.code === 'Enter') doShutter();
+    if(e.code === 'KeyG') Gallery.open();
+    if(e.code === 'Escape'){
+      Gallery.close();
+      Gallery.closeViewer();
+      $('settings-panel').classList.remove('open');
+      SelfTimer.cancel();
+    }
+    if(e.code === 'KeyF') Camera.switch();
+    if(e.code === 'ArrowLeft' || e.code === 'ArrowRight'){
+      const idx = FILTERS.findIndex(f=>f.id===S.settings.activeFilter);
+      const next = e.code==='ArrowRight'
+        ? Math.min(idx+1, FILTERS.length-1)
+        : Math.max(idx-1, 0);
+      FilterEngine.applyCSS(FILTERS[next].id);
+    }
+  });
+
+  // Prevent body scroll
+  document.addEventListener('touchmove', e => {
+    if(!e.target.closest('#gallery-scroll,.settings-scroll')) e.preventDefault();
+  }, {passive:false});
+}
+
+/* ==========================================================
+   SECTION 17: INITIALIZATION
+========================================================== */
+async function initCamera(){
+  $('btn-allow').disabled = true;
+  $('loading-ring').classList.remove('hidden');
+  $('btn-allow').textContent = 'STARTING…';
+
+  // Init storage & load settings
+  Storage.loadSettings();
+  await Storage.openDB().catch(()=>{});
+
+  // Load persisted photos from IndexedDB
+  const savedPhotos = await Storage.loadPhotos();
+  if(savedPhotos.length){
+    S.gallery.photos = savedPhotos.sort((a,b)=>a.ts-b.ts);
+    S.gallery.nextId = Math.max(...savedPhotos.map(p=>p.id)) + 1;
+  }
+
+  // Build filter strip
+  FilterEngine.buildStrip();
+
+  // Bind settings UI
+  bindSettings();
+
+  // Start camera (shows app on success)
+  try{
+    await Camera.start();
+    // Show app, hide welcome
+    $('welcome').classList.add('hidden');
+    $('app').classList.remove('hidden');
+    UI.syncSettingsUI();
+
+  }catch(err){
+    // Camera.start handles its own errors
+    $('btn-allow').disabled  = false;
+    $('btn-allow').textContent = 'TRY AGAIN';
+    $('loading-ring').classList.add('hidden');
+    return;
+  }
+
+  $('loading-ring').classList.add('hidden');
+  $('btn-allow').disabled = false;
+
+  // Ensure film state is consistent
+  S.film.size = S.settings.rollSize;
+  if(S.film.remaining > S.film.size) S.film.remaining = S.film.size;
+  if(S.film.remaining < 0)  S.film.remaining = 0;
+  UI.updateHUD();
+
+  // Scroll filter strip to active filter after a brief paint delay
+  setTimeout(()=>{
+    const active = document.querySelector('.filter-item.active');
+    if(active) active.scrollIntoView({behavior:'instant',inline:'center',block:'nearest'});
+  }, 150);
+
+  // If roll finished before app loaded, show the modal
+  if(S.film.remaining <= 0 && S.film.totalTaken > 0){
+    FilmRoll.showFinished();
+  }
+}
+
+async function bootstrap(){
+  // Bind all interactive events first
+  bindEvents();
+
+  // If camera permission was already granted in a previous session, auto-start
+  if(navigator.permissions){
+    try{
+      const status = await navigator.permissions.query({name:'camera'});
+      if(status.state === 'granted'){
+        await initCamera();
+        return;
+      }
+    }catch(e){ /* permission API not supported — show welcome normally */ }
+  }
+
+  // Default: welcome screen is already visible in HTML
+}
+
+document.addEventListener('DOMContentLoaded', bootstrap);
+</script>
+</body>
+  </html>
